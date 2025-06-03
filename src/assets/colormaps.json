@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Custom",
+    "gradient": "linear-gradient(to right, rgb(100, 20, 20), rgb(180, 40, 40), rgb(220,120,60), rgb(255,220,150), rgb(255, 250, 240))"
+  },
+  {
+    "name": "Viridis",
+    "gradient": "linear-gradient(to right, #440154, #3b528b, #21908d, #5dc863, #fde725)"
+  },
+  {
+    "name": "Grayscale",
+    "gradient": "linear-gradient(to right, #000, #fff)"
+  },
+  {
+    "name": "Plasma",
+    "gradient": "linear-gradient(to right, #0d0887, #6a00a8, #cb4778, #f89540, #f0f921)"
+  }
+]
