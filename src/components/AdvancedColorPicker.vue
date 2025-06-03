@@ -145,18 +145,57 @@
           @mousedown.prevent.stop="handleGaussianPointMouseDown($event, item.id)"
           @dblclick.prevent="handleGaussianPointDblClick($event, item.id)"
         />
+        <!-- Skew Indicator Line for selected Gaussian -->
+        <line
+          v-if="selectedGaussianId !== null && selectedGaussianSkewIndicatorLine && selectedGaussianSkewIndicatorLine.visible"
+          :x1="selectedGaussianSkewIndicatorLine.x1"
+          :y1="selectedGaussianSkewIndicatorLine.y1"
+          :x2="selectedGaussianSkewIndicatorLine.x2"
+          :y2="selectedGaussianSkewIndicatorLine.y2"
+          :stroke="selectedGaussianSkewIndicatorLine.stroke"
+          :stroke-width="selectedGaussianSkewIndicatorLine.strokeWidth"
+        />
+
         <!-- Gaussian Width Handles -->
         <rect
           v-for="handle in selectedGaussianWidthHandles"
           :key="handle.id"
           :x="handle.x"
-          :y="handle.y" 
+          :y="handle.y"
           :width="handle.width"
           :height="handle.height"
-          :fill="handle.fill" 
+          :fill="handle.fill"
           class="gaussian-width-handle"
           @mousedown.stop="handleWidthHandleMouseDown($event, handle.gaussianId, handle.side)"
         />
+
+        <!-- Gaussian Skew Handles -->
+        <g v-for="item_skew in renderedGaussians" :key="'skew-handles-' + item_skew.id">
+          <template v-if="item_skew.id === selectedGaussianId">
+            <!-- Left Skew Handle (Triangle pointing left) -->
+            <path
+              :d="`M ${item_skew.controlPoint.x - 14},${item_skew.controlPoint.y} L ${item_skew.controlPoint.x - 8},${item_skew.controlPoint.y - 4} L ${item_skew.controlPoint.x - 8},${item_skew.controlPoint.y + 4} Z`"
+              class="gaussian-skew-handle skew-left"
+              :fill="currentTheme === 'light' ? '#4CAF50' : '#81C784'"
+              stroke="currentColor"
+              stroke-width="1"
+              style="cursor: pointer;"
+              @mousedown.prevent.stop="handleSkewMouseDown($event, item_skew.id, 'left')"
+              title="Skew Left"
+            />
+            <!-- Right Skew Handle (Triangle pointing right) -->
+            <path
+              :d="`M ${item_skew.controlPoint.x + 14},${item_skew.controlPoint.y} L ${item_skew.controlPoint.x + 8},${item_skew.controlPoint.y - 4} L ${item_skew.controlPoint.x + 8},${item_skew.controlPoint.y + 4} Z`"
+              class="gaussian-skew-handle skew-right"
+              :fill="currentTheme === 'light' ? '#4CAF50' : '#81C784'"
+              stroke="currentColor"
+              stroke-width="1"
+              style="cursor: pointer;"
+              @mousedown.prevent.stop="handleSkewMouseDown($event, item_skew.id, 'right')"
+              title="Skew Right"
+            />
+          </template>
+        </g>
       </svg>
       <div v-else-if="transferFunctionMode !== 'linear' && transferFunctionMode !== 'gaussian'" class="picker-area-placeholder">
         <span>Graphic editor for '{{ transferFunctionMode }}' mode is not yet implemented.</span>
@@ -232,7 +271,7 @@ export default {
       histogramBins: 256,
       useLogScale: false,
       // Gaussian Transfer Function Editor Data
-      gaussians: [], // Array of { id, c, h_control, b, w }
+      gaussians: [], // Array of { id, c, h_control, b, w, opacity, skew }
       selectedGaussianId: null,
       draggingGaussianId: null, // ID of the gaussian being dragged
       gaussianDragStartX: 0, // For dragging calculation
@@ -242,7 +281,9 @@ export default {
       ignoreNextBackgroundClickForGaussian: false,
       nextGaussianId: 0,
       // New properties for width handles:
-      activeDragMode: null, // null, 'center', or 'width'
+      activeDragMode: null, // Can be 'center', 'widthLeft', 'widthRight', 'skewLeft', 'skewRight'
+      originalGaussianSkew: 0,
+      initialMouseXForSkew: 0,
       draggingWidthHandleSide: null, // 'left' or 'right'
       widthHandleInteractionActive: false, // Flag to prioritize width handle clicks
       widthHandleSize: 12, // Pixel size of the square width handles
@@ -353,17 +394,25 @@ export default {
         } else {
             for (let i = 0; i <= samples; i++) {
                 const x_norm = i / samples;
-                let effectiveSigma = baseSigma;
-                if (g.s && g.s !== 0) { // Check if s exists and is non-zero
-                  if (x_norm < g.c) {
-                    effectiveSigma = baseSigma * (1 - g.s); // Positive s narrows left side
-                  } else {
-                    effectiveSigma = baseSigma * (1 + g.s); // Positive s widens right side
-                  }
-                  effectiveSigma = Math.max(1e-6, effectiveSigma); // Prevent zero or negative sigma
+                const s = g.skew || 0; // Current skew value, default to 0
+                let gamma = 1;
+                if (s > 1e-6) { // Positive skew (skewed to the right)
+                  gamma = 1 + s;
+                } else if (s < -1e-6) { // Negative skew (skewed to the left)
+                  gamma = 1 / (1 - s); // s is negative, so (1-s) is > 1
                 }
+
+                const distFromCenter = x_norm - g.c;
+                let effective_dist_for_exponent;
+                if (distFromCenter >= 0) { // Point is to the right of or at the center
+                  effective_dist_for_exponent = distFromCenter / gamma;
+                } else { // Point is to the left of the center
+                  effective_dist_for_exponent = distFromCenter * gamma;
+                }
+
                 // Gaussian equation for y_norm (0 at top, 1 at bottom)
-                const y_norm_at_x = g.b + (g.h_control - g.b) * Math.exp(-Math.pow(x_norm - g.c, 2) / (2 * Math.pow(effectiveSigma, 2)));
+                // Use baseSigma directly; skew effect is handled by adjusting distance via gamma
+                const y_norm_at_x = g.b + (g.h_control - g.b) * Math.exp(-Math.pow(effective_dist_for_exponent, 2) / (2 * Math.pow(baseSigma, 2)));
                 
                 const pixel = this.normalizedToPixel({ x: x_norm, y: y_norm_at_x });
                 pathData += `${pixel.x},${pixel.y}`;
@@ -381,10 +430,51 @@ export default {
           c: g.c, 
           h_control: g.h_control,
           b: g.b,
-          w: g.w
+          w: g.w,
+          opacity: g.opacity,
+          skew: g.skew
         });
       });
       return items;
+    },
+
+    selectedGaussianSkewIndicatorLine() {
+      if (this.selectedGaussianId === null || typeof this.selectedGaussianId === 'undefined') {
+        return { visible: false };
+      }
+      const gaussian = this.gaussians.find(g => g.id === this.selectedGaussianId);
+      if (!gaussian) {
+        return { visible: false };
+      }
+
+      const s = gaussian.skew || 0;
+      let gamma = 1;
+      if (s > 1e-6) { // Positive skew (skewed to the right)
+        gamma = 1 + s;
+      } else if (s < -1e-6) { // Negative skew (skewed to the left)
+        gamma = 1 / (1 - s); // s is negative, so (1-s) is > 1, making gamma < 1 for F&S formula application
+      }
+
+      const baseHalfWidth = gaussian.w / 2;
+
+      // Calculate the normalized X-coordinate for the center of the skewed distribution's span
+      const normX_mid_skewed = gaussian.c + (baseHalfWidth / 2) * (gamma - (1 / gamma));
+
+      // Convert to pixel coordinates
+      const pixelX = this.normalizedToPixel({ x: normX_mid_skewed, y: gaussian.h_control }).x;
+      const pixelY_h_control = this.normalizedToPixel({ x: gaussian.c, y: gaussian.h_control }).y;
+
+      const lineHalfHeight = 14; // For a 28px tall line, reflecting triangle horizontal span
+
+      return {
+        x1: pixelX,
+        y1: pixelY_h_control - lineHalfHeight,
+        x2: pixelX, // Same X for a vertical line
+        y2: pixelY_h_control + lineHalfHeight,
+        stroke: 'red',
+        strokeWidth: 2.5, // Increased thickness
+        visible: true
+      };
     },
     currentGradientStops() {
       if (!this.selectedColormapGradient) return [];
@@ -562,17 +652,27 @@ export default {
           if (baseSigma < 1e-6) { // Effectively zero width, treat as a spike
             y_gaussian_at_x = (Math.abs(x_norm - g.c) < (0.5 / this.svgEditorWidth)) ? g.h_control : g.b;
           } else {
-            let effectiveSigma = baseSigma;
-            if (g.s && g.s !== 0) { // Check if s exists and is non-zero
-              if (x_norm < g.c) {
-                effectiveSigma = baseSigma * (1 - g.s); // Positive s narrows left side
-              } else {
-                effectiveSigma = baseSigma * (1 + g.s); // Positive s widens right side
-              }
-              effectiveSigma = Math.max(1e-6, effectiveSigma); // Prevent zero or negative sigma
+            const s = g.skew || 0; // Current skew value, default to 0
+            let gamma = 1;
+            if (s > 1e-6) { // Positive skew (skewed to the right)
+              gamma = 1 + s;
+            } else if (s < -1e-6) { // Negative skew (skewed to the left)
+              gamma = 1 / (1 - s); // s is negative, so (1-s) is > 1
             }
+            // if s is very close to 0, gamma remains 1 (no skew)
+
+            const distFromCenter = x_norm - g.c;
+            let effective_dist_for_exponent;
+
+            if (distFromCenter >= 0) { // Point is to the right of or at the center
+              effective_dist_for_exponent = distFromCenter / gamma;
+            } else { // Point is to the left of the center
+              effective_dist_for_exponent = distFromCenter * gamma;
+            }
+            
             const amplitudeFactor = g.h_control - g.b; // h_control is peak, b is baseline
-            const exponent = -Math.pow(x_norm - g.c, 2) / (2 * effectiveSigma * effectiveSigma);
+            // Use baseSigma directly; skew effect is handled by adjusting distance via gamma
+            const exponent = -Math.pow(effective_dist_for_exponent, 2) / (2 * baseSigma * baseSigma);
             y_gaussian_at_x = g.b + amplitudeFactor * Math.exp(exponent);
           }
           combined_y_norm_at_x = Math.max(combined_y_norm_at_x, y_gaussian_at_x);
@@ -827,7 +927,7 @@ export default {
       if (event) event.preventDefault(); // Prevent any default action if event is passed
 
       if (this.isDragging && this.draggedPointObject) {
-        // Ensure point still exists before sorting and finding index
+        // Ensure the point still exists before sorting and finding index
         if (this.linearPoints.includes(this.draggedPointObject)) {
             this.linearPoints.sort((a, b) => a.x - b.x);
             // Update selectedPointIndex to the final position of the dragged point
@@ -949,7 +1049,8 @@ export default {
         h_control: normalizedCoords.y, // Peak Y (0-1, normalized, 0 is top)
         b: 0.0,                      // Baseline Y (0-1, normalized, 0 is top)
         w: 0.1,                      // Width FWHM (0-1, normalized, proportion of editor width)
-        s: 0.0,                      // Skewness (-1 to 1, 0 for no skew, positive skews right)
+        opacity: 1.0,                // Opacity (0-1, normalized)
+        skew: 0                      // Skewness (e.g., -1 to 1, 0 for no skew)
       };
       this.gaussians.push(newGaussian);
       this.selectedGaussianId = newGaussian.id; // Select the new Gaussian
@@ -1108,6 +1209,96 @@ export default {
         window.removeEventListener('mousemove', this.handleGaussianWidthHandleMouseMove);
         window.removeEventListener('mouseup', this.handleGaussianDragMouseUp);
       }
+    },
+
+    handleSkewMouseDown(event, gaussianId, side) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      this.draggingGaussianId = gaussianId;
+      this.activeDragMode = side === 'left' ? 'skewLeft' : 'skewRight';
+
+      const svg = this.$refs.gaussianEditorSvg;
+      if (!svg) {
+        console.error('Gaussian editor SVG element not found.');
+        return;
+      }
+
+      const initialMousePos = this.getSvgCoordinates(event, svg);
+      if (!initialMousePos) {
+        console.error('Could not get SVG coordinates for skew mouse down.');
+        return;
+      }
+      this.initialMouseXForSkew = initialMousePos.x;
+
+      const gaussian = this.gaussians.find(g => g.id === gaussianId);
+      if (gaussian) {
+        if (side === 'right' && gaussian.skew < 0) {
+          this.originalGaussianSkew = 0;
+        } else if (side === 'left' && gaussian.skew > 0) {
+          this.originalGaussianSkew = 0;
+        } else {
+          this.originalGaussianSkew = gaussian.skew;
+        }
+      } else {
+        console.error(`Gaussian with ID ${gaussianId} not found for skew operation.`);
+        this.activeDragMode = null; // Reset drag mode if Gaussian not found
+        return;
+      }
+
+      // Add listeners for mouse move and mouse up to handle the dragging
+      document.addEventListener('mousemove', this.handleGaussianSkewMouseMove);
+      document.addEventListener('mouseup', this.handleGaussianSkewMouseUp);
+    },
+
+    handleGaussianSkewMouseMove(event) {
+      if (this.activeDragMode !== 'skewLeft' && this.activeDragMode !== 'skewRight') {
+        return;
+      }
+      event.preventDefault();
+
+      const svg = this.$refs.gaussianEditorSvg;
+      if (!svg) {
+        console.error('Gaussian editor SVG element not found during skew move.');
+        return;
+      }
+
+      const currentMousePos = this.getSvgCoordinates(event, svg);
+      if (!currentMousePos) {
+        console.error('Could not get SVG coordinates during skew move.');
+        return;
+      }
+
+      const gaussian = this.gaussians.find(g => g.id === this.draggingGaussianId);
+      if (!gaussian) {
+        console.error(`Gaussian with ID ${this.draggingGaussianId} not found during skew move.`);
+        this.handleGaussianSkewMouseUp(event); // Clean up
+        return;
+      }
+
+      const deltaX = currentMousePos.x - this.initialMouseXForSkew;
+      const skewSensitivity = 0.005; // Adjust for desired sensitivity
+      const changeInSkew = deltaX * skewSensitivity;
+      let newSkew;
+
+      if (this.activeDragMode === 'skewRight') {
+        newSkew = this.originalGaussianSkew + changeInSkew;
+        newSkew = Math.max(0, Math.min(1, newSkew)); // Clamp to [0, 1]
+      } else { // activeDragMode === 'skewLeft'
+        newSkew = this.originalGaussianSkew + changeInSkew; // Note: if original was >0, it's now 0.
+                                                          // Dragging left (deltaX < 0) will make changeInSkew negative.
+        newSkew = Math.max(-1, Math.min(0, newSkew)); // Clamp to [-1, 0]
+      }
+
+      gaussian.skew = newSkew;
+    },
+
+    handleGaussianSkewMouseUp(event) {
+      // Logic for finalizing skew adjustment and cleaning up listeners will go here.
+      this.activeDragMode = null;
+      this.draggingGaussianId = null;
+      document.removeEventListener('mousemove', this.handleGaussianSkewMouseMove);
+      document.removeEventListener('mouseup', this.handleGaussianSkewMouseUp);
     },
     // --- End Gaussian Transfer Function Editor Methods ---
 
