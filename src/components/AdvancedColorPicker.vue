@@ -1170,53 +1170,64 @@ export default {
 
     // --- Gaussian Transfer Function Editor Methods ---
     handleGaussianEditorBackgroundClick(event) {
-      if (this.biasInteractionActive) return; // Prevent if bias interaction is active
-      if (this.pointInteractionRecentlyActive || this.ignoreNextBackgroundClickForGaussian) {
-        // If a point interaction just finished, or we explicitly set the flag (e.g., after handle interaction)
-        // consume the flag and prevent new Gaussian creation.
-        this.pointInteractionRecentlyActive = false; // Reset after checking
-        this.ignoreNextBackgroundClickForGaussian = false; 
-        return;
-      }
-      if (!this.$refs.gaussianEditorSvg) return;
+  
+  
+  
+  
+      if (this.biasInteractionActive) {
+    
+    return; // Prevent if bias interaction is active
+  }
+  if (this.pointInteractionRecentlyActive || this.ignoreNextBackgroundClickForGaussian) {
+    
+    this.pointInteractionRecentlyActive = false; // Reset after checking
+    this.ignoreNextBackgroundClickForGaussian = false; 
+    return;
+  }
+  if (!this.$refs.gaussianEditorSvg) {
+    console.log('[DEBUG] Early return: gaussianEditorSvg ref missing');
+    return;
+  }
 
-      const clickCoords = this.getSvgCoordinates(event, this.$refs.gaussianEditorSvg);
-      if (!clickCoords) return;
+  const clickCoords = this.getSvgCoordinates(event, this.$refs.gaussianEditorSvg);
+  if (!clickCoords) {
+    console.log('[DEBUG] Early return: clickCoords missing');
+    return;
+  }
 
       // Check if the click is near an existing control point
       for (const g of this.gaussians) {
-        const pointPixel = this.normalizedToPixel({ x: g.c, y: g.h_control });
-        const dx = clickCoords.x - pointPixel.x;
-        const dy = clickCoords.y - pointPixel.y;
-        const distSq = dx * dx + dy * dy;
+    const pointPixel = this.normalizedToPixel({ x: g.c, y: g.h_control });
+    const dx = clickCoords.x - pointPixel.x;
+    const dy = clickCoords.y - pointPixel.y;
+    const distSq = dx * dx + dy * dy;
+    
 
-        if (distSq <= GAUSSIAN_POINT_HIT_RADIUS_SQUARED) {
-          // Click is near an existing point. Select it and do not add a new one.
-          this.selectedGaussianId = g.id;
-          // If the original event target was the SVG, but we're treating this as a point interaction,
-          // we might want to stop propagation to prevent other SVG-level handlers if any existed.
-          event.stopPropagation(); 
-          return;
-        }
-      }
+    if (distSq <= GAUSSIAN_POINT_HIT_RADIUS_SQUARED) {
+      
+      this.selectedGaussianId = g.id;
+      event.stopPropagation(); 
+      return;
+    }
+  }
 
       // If not near any point, proceed to add a new Gaussian (original logic continues from here)
+  
 
+  const normalizedCoords = this.pixelToNormalized(clickCoords);
 
-
-      const normalizedCoords = this.pixelToNormalized(clickCoords);
-
-      const newGaussian = {
-        id: this.nextGaussianId++,
-        c: normalizedCoords.x,       // Center (0-1, normalized)
-        h_control: normalizedCoords.y, // Peak Y (0-1, normalized, 0 is top)
-        b: 0.0,                      // Baseline Y (0-1, normalized, 0 is top)
-        w: 0.1,                      // Width FWHM (0-1, normalized, proportion of editor width)
-        opacity: 1.0,                // Opacity (0-1, normalized)
-        skew: 0                      // Skewness (e.g., -1 to 1, 0 for no skew)
-      };
-      this.gaussians.push(newGaussian);
-      this.selectedGaussianId = newGaussian.id; // Select the new Gaussian
+  const newGaussian = {
+    id: this.nextGaussianId++,
+    c: normalizedCoords.x,       // Center (0-1, normalized)
+    h_control: normalizedCoords.y, // Peak Y (0-1, normalized, 0 is top)
+    b: 0.0,                      // Baseline Y (0-1, normalized, 0 is top)
+    w: 0.1,                      // Width FWHM (0-1, normalized, proportion of editor width)
+    opacity: 1.0,                // Opacity (0-1, normalized)
+    skew: 0                      // Skewness (e.g., -1 to 1, 0 for no skew)
+  };
+  this.gaussians.push(newGaussian);
+  
+  this.selectedGaussianId = newGaussian.id; // Select the new Gaussian
       // console.log('Added Gaussian:', newGaussian, this.gaussians);
     },
     handleGaussianPointMouseDown(event, gaussianId) {
@@ -1472,6 +1483,7 @@ export default {
         this.originalGaussianBias = gaussian.b;
       }
       document.addEventListener('mousemove', this.handleGaussianBiasMouseMove);
+      
       document.addEventListener('mouseup', this.handleGaussianBiasMouseUp);
     },
     handleGaussianBiasMouseMove(event) {
@@ -1495,19 +1507,22 @@ export default {
       gaussian.b = newBias;
     },
     handleGaussianBiasMouseUp(event) {
-      if (this.activeDragMode !== 'bias') return; // Ensure we only act on bias drag
-      this.activeDragMode = null;
-      // draggingGaussianId is reset by the general handleGaussianDragMouseUp if called,
-      // but good to nullify here if we stop relying on that for bias.
-      // For now, let's be explicit:
-      this.draggingGaussianId = null; 
-      document.removeEventListener('mousemove', this.handleGaussianBiasMouseMove);
-      document.removeEventListener('mouseup', this.handleGaussianBiasMouseUp);
-      this.$nextTick(() => { // Delay reset to allow click event to process fully
-        this.biasInteractionActive = false;
-        this.ignoreNextBackgroundClickForGaussian = false;
-      });
-    },
+  
+  // Always remove listeners and reset flags, even if not in bias mode
+  document.removeEventListener('mousemove', this.handleGaussianBiasMouseMove);
+  
+  document.removeEventListener('mouseup', this.handleGaussianBiasMouseUp);
+  this.biasInteractionActive = false;
+  
+  this.ignoreNextBackgroundClickForGaussian = true;
+  
+  if (this.activeDragMode !== 'bias') return;
+  this.activeDragMode = null;
+  this.draggingGaussianId = null;
+  // Call the generic drag mouse up handler to reset all shared state and listeners
+  this.handleGaussianDragMouseUp(event);
+
+},
 
     handleGaussianSkewMouseUp(event) {
       // Logic for finalizing skew adjustment and cleaning up listeners will go here.
