@@ -169,6 +169,42 @@
           @mousedown.stop="handleWidthHandleMouseDown($event, handle.gaussianId, handle.side)"
         />
 
+        <!-- Gaussian Bias Handles -->
+        <g v-if="selectedGaussianId !== null">
+          <path
+            v-for="handle in selectedGaussianBiasHandles"
+            :key="handle.id"
+            :d="handle.path"
+            :fill="handle.fill"
+            class="gaussian-bias-handle" 
+            @mousedown.stop="handleBiasMouseDown($event, handle.gaussianId, handle.direction)"
+          />
+        </g>
+
+        <!-- Bias Indicator Line for selected Gaussian -->
+        <line
+          v-if="selectedGaussianId !== null && selectedGaussianBiasIndicatorLine && selectedGaussianBiasIndicatorLine.visible"
+          :x1="selectedGaussianBiasIndicatorLine.x1"
+          :y1="selectedGaussianBiasIndicatorLine.y1"
+          :x2="selectedGaussianBiasIndicatorLine.x2"
+          :y2="selectedGaussianBiasIndicatorLine.y2"
+          :stroke="selectedGaussianBiasIndicatorLine.stroke"
+          :stroke-width="selectedGaussianBiasIndicatorLine.strokeWidth"
+        />
+
+        <!-- Gaussian Bias Handles -->
+        <g v-for="handle in selectedGaussianBiasHandles" :key="handle.id">
+          <path
+            :d="handle.path"
+            :fill="handle.fill"
+            stroke="currentColor"
+            stroke-width="1"
+            :class="handle.class" 
+            @mousedown.prevent.stop="handleBiasMouseDown($event, handle.gaussianId, handle.direction)"
+            :title="handle.direction === 'up' ? 'Increase Bias' : 'Decrease Bias'"
+          />
+        </g>
+
         <!-- Gaussian Skew Handles -->
         <g v-for="item_skew in renderedGaussians" :key="'skew-handles-' + item_skew.id">
           <template v-if="item_skew.id === selectedGaussianId">
@@ -275,18 +311,19 @@ export default {
       selectedGaussianId: null,
       draggingGaussianId: null, // ID of the gaussian being dragged
       gaussianDragStartX: 0, // For dragging calculation
-      gaussianDragStartY: 0,
-      initialGaussianDragC: 0,
-      initialGaussianDragH: 0, // For dragging calculation
+      originalGaussianW: 0,
+      originalGaussianSkew: 0,
+      initialMouseXForSkew: 0, // Used for skew specific calculations
+      initialMouseYForBias: 0, // Used for bias specific calculations
+      originalGaussianBias: 0,   // Used for bias specific calculations
       ignoreNextBackgroundClickForGaussian: false,
       nextGaussianId: 0,
       // New properties for width handles:
-      activeDragMode: null, // Can be 'center', 'widthLeft', 'widthRight', 'skewLeft', 'skewRight'
-      originalGaussianSkew: 0,
-      initialMouseXForSkew: 0,
+      activeDragMode: null, // Can be 'center', 'widthLeft', 'widthRight', 'skewLeft', 'skewRight', 'bias'
       draggingWidthHandleSide: null, // 'left' or 'right'
       widthHandleInteractionActive: false, // Flag to prioritize width handle clicks
       widthHandleSize: 12, // Pixel size of the square width handles
+      biasInteractionActive: false, // Flag to prioritize bias handle clicks
     };
   },
   watch: {
@@ -350,7 +387,7 @@ export default {
       // const b = selectedGaussian.b; // Baseline y - no longer used for handle Y
 
       // Left handle: center x is c - w, y is slightly offset from baseline (halfway)
-      const leftHandleCenterNorm = { x: c - w, y: selectedGaussian.b + 0.025 };
+      const leftHandleCenterNorm = { x: c - w, y: 0.05 }; // Position handles at y=0.05 (normalized)
       const leftHandlePixel = this.normalizedToPixel(leftHandleCenterNorm);
       handles.push({
         id: `${selectedGaussian.id}-width-left`,
@@ -364,7 +401,7 @@ export default {
       });
 
       // Right handle: center x is c + w, y is slightly offset from baseline (halfway)
-      const rightHandleCenterNorm = { x: c + w, y: selectedGaussian.b + 0.025 };
+      const rightHandleCenterNorm = { x: c + w, y: 0.05 }; // Position handles at y=0.05 (normalized)
       const rightHandlePixel = this.normalizedToPixel(rightHandleCenterNorm);
       handles.push({
         id: `${selectedGaussian.id}-width-right`,
@@ -412,7 +449,19 @@ export default {
 
                 // Gaussian equation for y_norm (0 at top, 1 at bottom)
                 // Use baseSigma directly; skew effect is handled by adjusting distance via gamma
-                const y_norm_at_x = g.b + (g.h_control - g.b) * Math.exp(-Math.pow(effective_dist_for_exponent, 2) / (2 * Math.pow(baseSigma, 2)));
+                // New logic: if x_norm is outside g.w from center g.c, y_norm_at_x = g.b.
+                // Otherwise, use the full Gaussian formula.
+                let y_norm_at_x;
+                if (Math.abs(x_norm - g.c) > g.w) { // Changed (g.w / 2) to g.w
+                  y_norm_at_x = 0.0;
+                } else {
+                  // baseSigma and effective_dist_for_exponent are already calculated immediately above this block.
+                  y_norm_at_x = g.b + (g.h_control - g.b) * Math.exp(-Math.pow(effective_dist_for_exponent, 2) / (2 * Math.pow(baseSigma, 2)));
+                }
+                // Clamp y_norm_at_x to not exceed g.h_control
+                if (y_norm_at_x > g.h_control) {
+                  y_norm_at_x = g.h_control;
+                }
                 
                 const pixel = this.normalizedToPixel({ x: x_norm, y: y_norm_at_x });
                 pathData += `${pixel.x},${pixel.y}`;
@@ -475,6 +524,91 @@ export default {
         strokeWidth: 2.5, // Increased thickness
         visible: true
       };
+    },
+    selectedGaussianBiasHandles() {
+      if (this.selectedGaussianId === null) return [];
+      const gaussian = this.gaussians.find(g => g.id === this.selectedGaussianId);
+      if (!gaussian) return [];
+
+      const peakPixel = this.normalizedToPixel({ x: gaussian.c, y: gaussian.h_control });
+      const cx = peakPixel.x;
+      const cpy_peak = peakPixel.y;
+      // New dimensions to match skew handles' visual prominence:
+      // Skew: length 6 (horizontal), base 8 (vertical)
+      // Bias: length 8 (vertical), base 6 (horizontal)
+      const handleSize = 3; // For a 6px wide base (half-width)
+      const handleOffset = 8; // Distance from Gaussian peak to base of triangle
+      const handleLength = 8; // Vertical length of the triangle (tip to base)
+
+      // Upper handle (points up)
+      // Tip Y: cpy_peak - handleOffset - handleLength (higher on screen)
+      // Base Y: cpy_peak - handleOffset
+      const upTrianglePath = `M ${cx},${cpy_peak - handleOffset - handleLength} L ${cx - handleSize},${cpy_peak - handleOffset} L ${cx + handleSize},${cpy_peak - handleOffset} Z`;
+
+      // Lower handle (points down)
+      // Tip Y: cpy_peak + handleOffset + handleLength (lower on screen)
+      // Base Y: cpy_peak + handleOffset
+      const downTrianglePath = `M ${cx},${cpy_peak + handleOffset + handleLength} L ${cx - handleSize},${cpy_peak + handleOffset} L ${cx + handleSize},${cpy_peak + handleOffset} Z`;
+      
+      return [
+        {
+          id: 'bias-up-' + gaussian.id,
+          path: upTrianglePath,
+          gaussianId: gaussian.id,
+          direction: 'up',
+          fill: 'green',
+          class: 'bias-handle'
+        },
+        {
+          id: 'bias-down-' + gaussian.id,
+          path: downTrianglePath,
+          gaussianId: gaussian.id,
+          direction: 'down',
+          fill: 'green',
+          class: 'bias-handle'
+        }
+      ];
+    },
+    selectedGaussianBiasIndicatorLine() {
+      if (this.selectedGaussianId === null) return { visible: false };
+      const gaussian = this.gaussians.find(g => g.id === this.selectedGaussianId);
+      if (!gaussian) return { visible: false };
+
+      const g_b = gaussian.b; // Gaussian's actual baseline parameter (0 to 1)
+      const g_h_control = gaussian.h_control; // Gaussian's peak height (normalized 0 to 1)
+
+      // Define constants for bias handle geometry (mirroring selectedGaussianBiasHandles)
+      const biasHandleVerticalOffset = 10; // pixels
+      const biasTriangleHeight = 6; // pixels
+
+      // Calculate the Y-coordinate of the tip of the bottom bias triangle
+      const peakPixelY = this.normalizedToPixel({ x: 0, y: g_h_control }).y;
+      const bottomTriangleTipPixelY = peakPixelY + biasHandleVerticalOffset + biasTriangleHeight;
+      const yNormBottomTriangleTip = this.pixelToNormalized({ x: 0, y: bottomTriangleTipPixelY }).y;
+
+      // Interpolate the red line's normalized Y position
+      // When g_b = 0, lineYNorm = g_h_control
+      // When g_b = 1, lineYNorm = yNormBottomTriangleTip
+      let lineYNorm = g_h_control + (yNormBottomTriangleTip - g_h_control) * g_b;
+
+      // Clamp the line's Y position to be within the editor bounds [0, 1] (normalized)
+      // Note: y=0 is bottom, y=1 is top for normalized, but pixel y is inverted.
+      // Clamping to ensure it doesn't go out of SVG view if calculations are extreme.
+      lineYNorm = Math.max(0, Math.min(1, lineYNorm)); 
+
+      const lineYPixel = this.normalizedToPixel({ x: 0, y: lineYNorm }).y;
+      const centerXPixel = this.normalizedToPixel({ x: gaussian.c, y: 0 }).x;
+      const halfWidth = 14; // For a 28px wide line
+
+      return {
+        x1: centerXPixel - halfWidth,
+        y1: lineYPixel,
+        x2: centerXPixel + halfWidth,
+        y2: lineYPixel,
+        stroke: 'red',
+        strokeWidth: 2.5,
+        visible: true
+      };    
     },
     currentGradientStops() {
       if (!this.selectedColormapGradient) return [];
@@ -620,12 +754,26 @@ export default {
     }
   },
   beforeUnmount() {
-    // Clean up global event listeners to prevent memory leaks or errors
+    // Clean up global event listeners for the Linear Transfer Function Editor
     window.removeEventListener('mousemove', this.handleEditorMouseMove);
     window.removeEventListener('mouseup', this.handleEditorMouseUp);
-    window.removeEventListener('mousemove', this.handleGaussianCenterPointMouseMove); // From Gaussian editor
-    window.removeEventListener('mouseup', this.handleGaussianDragMouseUp); // From Gaussian editor
-    window.removeEventListener('mousemove', this.handleGaussianWidthHandleMouseMove); // From Gaussian editor
+
+    // Clean up global event listeners for the Gaussian Transfer Function Editor
+    // Center point dragging
+    document.removeEventListener('mousemove', this.handleGaussianCenterPointMouseMove);
+    document.removeEventListener('mouseup', this.handleGaussianDragMouseUp); // Also used by width dragging
+
+    // Width handle dragging
+    document.removeEventListener('mousemove', this.handleGaussianWidthHandleMouseMove);
+    // mouseup is handleGaussianDragMouseUp
+
+    // Skew handle dragging
+    document.removeEventListener('mousemove', this.handleGaussianSkewMouseMove);
+    document.removeEventListener('mouseup', this.handleGaussianSkewMouseUp);
+
+    // Bias handle dragging
+    document.removeEventListener('mousemove', this.handleGaussianBiasMouseMove);
+    document.removeEventListener('mouseup', this.handleGaussianBiasMouseUp);
   },
   methods: {
     getGaussianEnvelopeRawPoints() {
@@ -673,7 +821,18 @@ export default {
             const amplitudeFactor = g.h_control - g.b; // h_control is peak, b is baseline
             // Use baseSigma directly; skew effect is handled by adjusting distance via gamma
             const exponent = -Math.pow(effective_dist_for_exponent, 2) / (2 * baseSigma * baseSigma);
-            y_gaussian_at_x = g.b + amplitudeFactor * Math.exp(exponent);
+            // New logic: if x_norm is outside g.w from center g.c, y_gaussian_at_x = g.b.
+            // Otherwise, use the full Gaussian formula.
+            if (Math.abs(x_norm - g.c) > g.w) { // Changed (g.w / 2) to g.w
+              y_gaussian_at_x = 0.0;
+            } else {
+              // amplitudeFactor and exponent are already calculated immediately above this block.
+              y_gaussian_at_x = g.b + amplitudeFactor * Math.exp(exponent);
+            }
+            // Clamp y_gaussian_at_x to not exceed g.h_control
+            if (y_gaussian_at_x > g.h_control) {
+              y_gaussian_at_x = g.h_control;
+            }
           }
           combined_y_norm_at_x = Math.max(combined_y_norm_at_x, y_gaussian_at_x);
         });
@@ -1011,8 +1170,12 @@ export default {
 
     // --- Gaussian Transfer Function Editor Methods ---
     handleGaussianEditorBackgroundClick(event) {
-      if (this.ignoreNextBackgroundClickForGaussian) {
-        this.ignoreNextBackgroundClickForGaussian = false; // Consume the flag for this click
+      if (this.biasInteractionActive) return; // Prevent if bias interaction is active
+      if (this.pointInteractionRecentlyActive || this.ignoreNextBackgroundClickForGaussian) {
+        // If a point interaction just finished, or we explicitly set the flag (e.g., after handle interaction)
+        // consume the flag and prevent new Gaussian creation.
+        this.pointInteractionRecentlyActive = false; // Reset after checking
+        this.ignoreNextBackgroundClickForGaussian = false; 
         return;
       }
       if (!this.$refs.gaussianEditorSvg) return;
@@ -1293,6 +1456,59 @@ export default {
       gaussian.skew = newSkew;
     },
 
+    handleBiasMouseDown(event, gaussianId, direction) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.biasInteractionActive = true;
+      this.ignoreNextBackgroundClickForGaussian = true; // Reinforce this
+      this.draggingGaussianId = gaussianId;
+      this.activeDragMode = 'bias'; // Using a general 'bias' mode
+      const svg = this.$refs.gaussianEditorSvg;
+      if (!svg) return;
+      const initialMousePos = this.getSvgCoordinates(event, svg);
+      this.initialMouseYForBias = initialMousePos.y;
+      const gaussian = this.gaussians.find(g => g.id === gaussianId);
+      if (gaussian) {
+        this.originalGaussianBias = gaussian.b;
+      }
+      document.addEventListener('mousemove', this.handleGaussianBiasMouseMove);
+      document.addEventListener('mouseup', this.handleGaussianBiasMouseUp);
+    },
+    handleGaussianBiasMouseMove(event) {
+      if (this.activeDragMode !== 'bias') return;
+      event.preventDefault();
+      const svg = this.$refs.gaussianEditorSvg;
+      if (!svg) return;
+      const currentMousePos = this.getSvgCoordinates(event, svg);
+      const gaussian = this.gaussians.find(g => g.id === this.draggingGaussianId);
+      if (!gaussian) return;
+
+      const deltaY_pixels = currentMousePos.y - this.initialMouseYForBias;
+      
+      // Sensitivity: 1.0 change in bias for dragging full editor height
+      const biasSensitivity = 1.0 / this.svgEditorHeight; 
+      const changeInBias = deltaY_pixels * biasSensitivity;
+      
+      let newBias = this.originalGaussianBias + changeInBias;
+      newBias = Math.max(0, Math.min(1, newBias)); // Clamp bias to [0, 1]
+      
+      gaussian.b = newBias;
+    },
+    handleGaussianBiasMouseUp(event) {
+      if (this.activeDragMode !== 'bias') return; // Ensure we only act on bias drag
+      this.activeDragMode = null;
+      // draggingGaussianId is reset by the general handleGaussianDragMouseUp if called,
+      // but good to nullify here if we stop relying on that for bias.
+      // For now, let's be explicit:
+      this.draggingGaussianId = null; 
+      document.removeEventListener('mousemove', this.handleGaussianBiasMouseMove);
+      document.removeEventListener('mouseup', this.handleGaussianBiasMouseUp);
+      this.$nextTick(() => { // Delay reset to allow click event to process fully
+        this.biasInteractionActive = false;
+        this.ignoreNextBackgroundClickForGaussian = false;
+      });
+    },
+
     handleGaussianSkewMouseUp(event) {
       // Logic for finalizing skew adjustment and cleaning up listeners will go here.
       this.activeDragMode = null;
@@ -1309,6 +1525,7 @@ export default {
     }
   }
 };
+
 </script>
 
 <style scoped>
@@ -1404,7 +1621,7 @@ export default {
   min-width: 60px; /* Ensure it doesn't get too small */
   /* width: 75px; */ /* Removed fixed width */
   height: 18px; /* Standard height for range inputs */
-  padding: 0; /* Remove padding for range */
+  padding: 0; /* Remove padding for a more compact look */
 }
 
 .opacity-display {
@@ -1470,6 +1687,10 @@ export default {
   height: 100%;
   color: var(--main-picker-area-placeholder-text-color);
   user-select: none;
+}
+
+.bias-handle {
+  cursor: pointer; /* Pointing finger cursor for consistency */
 }
 
 .color-input-row {
