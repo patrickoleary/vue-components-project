@@ -1,10 +1,10 @@
 <script setup>
-import AdvancedColorPicker from './components/AdvancedColorPicker.vue';
+import AdvancedTransferFunctionEditor from './components/AdvancedTransferFunctionEditor.vue';
 </script>
 
 <template>
   <main>
-    <AdvancedColorPicker />
+    <AdvancedTransferFunctionEditor />
   </main>
 </template>
 

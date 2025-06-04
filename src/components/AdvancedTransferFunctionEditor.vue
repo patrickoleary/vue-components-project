@@ -269,7 +269,7 @@ import colormapOptions from '@/assets/colormaps.json';
 const GAUSSIAN_POINT_HIT_RADIUS_SQUARED = 10 * 10; // Pixel radius of 10, squared
 
 export default {
-  name: 'AdvancedColorPicker',
+  name: 'AdvancedTransferFunctionEditor',
   data() {
     const defaultMinValue = '573.113';
     const defaultMaxValue = '886.808';

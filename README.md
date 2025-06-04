@@ -1,6 +1,6 @@
-# AdvancedColorPicker.vue - A Vue 3 Component
+# AdvancedTransferFunctionEditor.vue - A Vue 3 Component
 
-The `AdvancedColorPicker.vue` is a sophisticated Vue 3 component designed for interactive creation and manipulation of 1D transfer functions and colormaps. It provides a rich user interface for defining how data values map to colors and opacities, commonly used in scientific visualization and data analysis applications.
+The `AdvancedTransferFunctionEditor.vue` is a sophisticated Vue 3 component designed for interactive creation and manipulation of 1D transfer functions and colormaps. It provides a rich user interface for defining how data values map to colors and opacities, commonly used in scientific visualization and data analysis applications.
 
 ## Project Goals
 
@@ -173,4 +173,4 @@ npm run build
 ```
 ---
 
-This README provides a comprehensive overview. For detailed implementation of props and events, refer to the `AdvancedColorPicker.vue` source code.
+This README provides a comprehensive overview. For detailed implementation of props and events, refer to the `AdvancedTransferFunctionEditor.vue` source code.
