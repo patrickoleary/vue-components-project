@@ -10,7 +10,7 @@
         </option>
       </select>
       <input type="text" class="number-input" v-model="maxValue" title="Maximum Value" />
-      <div class="action-icon" @click="resetMinMaxValues" title="Reset Min/Max Values">↻</div>
+      <button class="action-icon" @click="resetMinMaxValues" title="Reset Min/Max Values"><i class="mdi mdi-restore"></i></button>
     </div>
     <div class="main-picker-area" :style="{ backgroundColor: backgroundColorValue }">
       <svg
@@ -252,11 +252,11 @@
       </div>
 
       <div class="tf-control-group histogram-toggle-group">
-        <button class="icon-toggle-button" :class="{ 'active-toggle': showHistogram }" @click="showHistogram = !showHistogram" title="Toggle Histogram Display">📊</button>
+        <button class="icon-toggle-button" :class="{ 'active-toggle': showHistogram }" @click="showHistogram = !showHistogram" title="Toggle Histogram Display"><i class="mdi mdi-chart-histogram"></i></button>
       </div>
 
       <div class="tf-control-group histogram-log-scale-group">
-        <button class="icon-toggle-button" :class="{ 'active-toggle': useLogScale }" @click="useLogScale = !useLogScale" title="Use Log Scale for Histogram">📈</button>
+        <button class="icon-toggle-button" :class="{ 'active-toggle': useLogScale }" @click="useLogScale = !useLogScale" title="Use Log Scale for Histogram"><i class="mdi mdi-math-log"></i></button>
       </div>
 
       </div>
