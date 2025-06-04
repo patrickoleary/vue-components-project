@@ -23,22 +23,24 @@ The component's UI is primarily divided into a top control area (organized into 
 
 The top control area houses key controls for configuring the transfer function and editor behavior:
 
-**First Row (Primary Settings):**
 *   **Background Color Picker:** Allows selection of a base background color for the main editor canvas, helping to visualize how the transfer function will appear against different backgrounds.
 *   **Histogram Color Picker:** Sets the color for the optional data histogram display.
 *   **Min/Max Value Inputs:** Text input fields to define the data range (`minValue`, `maxValue`) over which the transfer function is applied.
 *   **Colormap Selector (Dropdown):** A dropdown menu to select the active colormap from a predefined list. The selected colormap is displayed as a gradient.
 *   **Reset Min/Max Values (Button with Restore Icon):** A button to reset the `minValue` and `maxValue` to their initial default settings.
 
-**Second Row (Editor Mode and Display Options):**
+### Main Editor Area
+
+The main editor area is the large interactive canvas where the transfer function is visually defined and manipulated. The appearance and interaction within this area change based on whether 'Linear' or 'Gaussian' mode is selected. This area is detailed further in the "Core Editors & Interactivity" section.
+
+### Bottom Control Area
+
+The bottom control area houses key controls for configuring the transfer function editor and editors display options:
+
 *   **Transfer Function Mode Selector (Dropdown):** Allows switching the editor between 'Linear' mode (for piecewise linear functions) and 'Gaussian' mode (for functions defined by summing Gaussian curves).
 *   **Global Opacity Slider:** Controls the overall opacity of the generated transfer function polygon. The current opacity percentage is displayed next to the slider.
 *   **Histogram Toggle (Button with Chart Icon):** A button to show or hide the underlying data histogram in the editor area.
 *   **Histogram Log Scale Toggle (Button with Math Log Icon):** A button to switch the histogram's y-axis between linear and logarithmic scales.
-
-### Main Editor Area
-
-Below the control area is the large interactive canvas where the transfer function is visually defined and manipulated. The appearance and interaction within this area change based on whether 'Linear' or 'Gaussian' mode is selected. This area is detailed further in the "Core Editors & Interactivity" section.
 
 ## Core Editors & Interactivity
 
