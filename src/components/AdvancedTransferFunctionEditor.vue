@@ -270,60 +270,86 @@ const GAUSSIAN_POINT_HIT_RADIUS_SQUARED = 10 * 10; // Pixel radius of 10, square
 
 export default {
   name: 'AdvancedTransferFunctionEditor',
+  props: {
+    initialMinValueProp: {
+      type: [String, Number],
+      default: '573.113'
+    },
+    initialMaxValueProp: {
+      type: [String, Number],
+      default: '886.808'
+    },
+    histogramDataProp: {
+      type: Array,
+      default: () => []
+    },
+    initialThemeProp: {
+      type: String,
+      default: 'light',
+      validator: function (value) {
+        return ['light', 'dark'].includes(value);
+      }
+    },
+    initialTransferFunctionModeProp: {
+      type: String,
+      default: 'linear',
+      validator: function (value) {
+        return ['linear', 'gaussian'].includes(value);
+      }
+    }
+  },
   data() {
-    const defaultMinValue = '573.113';
-    const defaultMaxValue = '886.808';
     return {
-      backgroundColorValue: '#D3D3D3', /* Default to light grey */
-      minValue: defaultMinValue,
-      maxValue: defaultMaxValue,
-      initialMinValue: defaultMinValue,
-      initialMaxValue: defaultMaxValue,
+      backgroundColorValue: '#D3D3D3', // Default to light grey
+      minValue: this.initialMinValueProp,
+      maxValue: this.initialMaxValueProp,
+      initialMinValue: this.initialMinValueProp, // For reset, now sourced from prop
+      initialMaxValue: this.initialMaxValueProp, // For reset, now sourced from prop
       colormaps: colormapOptions,
-      selectedColormapGradient: colormapOptions.length > 0 ? colormapOptions[0].gradient : '', // Initialize with the first colormap's gradient
-      transferFunctionMode: 'linear',
+      selectedColormapGradient: colormapOptions.length > 0 ? colormapOptions[0].gradient : '',
+      transferFunctionMode: this.initialTransferFunctionModeProp,
       transferFunctionModes: [
         { value: 'linear', text: 'Linear' },
         { value: 'gaussian', text: 'Gaussian' }
       ],
       transferFunctionOpacity: 100,
-      showHistogram: true,
-      histogramColor: '#A9A9A9', /* Default to medium grey */
-      currentTheme: 'light', // 'light' or 'dark'
+      showHistogram: true, // Remains internally managed
+      histogramColor: '#A9A9A9', // Remains internally managed
+      currentTheme: this.initialThemeProp,
       // Linear Transfer Function Editor Data
-      linearPoints: [{ x: 0, y: 0 }, { x: 1, y: 1 }], // Normalized coordinates (0-1 range)
+      linearPoints: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
       selectedPointIndex: null,
-      draggingPointIndex: null, // Index of the point being dragged
-      draggedPointObject: null, // Actual object of the point being dragged
+      draggingPointIndex: null,
+      draggedPointObject: null,
       isDragging: false,
-      mouseDownTimeout: null, // For distinguishing click/dblclick from drag
-      pendingDragIndex: null, // For distinguishing click/dblclick from drag
-      initialMousePosition: { x: 0, y: 0 }, // Store mouse position on mousedown for drag threshold
-      dragThreshold: 5, // Pixels mouse must move before a drag starts
-      pointInteractionRecentlyActive: false, // To prevent bg click immediately after point interaction
-      svgEditorWidth: 338, // Pixel width of the SVG drawing area
-      svgEditorHeight: 150, // Pixel height of the SVG drawing area
-      histogramData: [],
+      mouseDownTimeout: null,
+      pendingDragIndex: null,
+      initialMousePosition: { x: 0, y: 0 },
+      dragThreshold: 5,
+      pointInteractionRecentlyActive: false,
+      svgEditorWidth: 338,
+      svgEditorHeight: 150,
+      histogramData: [...this.histogramDataProp], // Initialize from prop
       histogramBins: 256,
       useLogScale: false,
       // Gaussian Transfer Function Editor Data
-      gaussians: [], // Array of { id, c, h_control, b, w, opacity, skew }
+      gaussians: [],
       selectedGaussianId: null,
-      draggingGaussianId: null, // ID of the gaussian being dragged
-      gaussianDragStartX: 0, // For dragging calculation
+      draggingGaussianId: null,
+      gaussianDragStartX: 0,
       originalGaussianW: 0,
       originalGaussianSkew: 0,
-      initialMouseXForSkew: 0, // Used for skew specific calculations
-      initialMouseYForBias: 0, // Used for bias specific calculations
-      originalGaussianBias: 0,   // Used for bias specific calculations
+      initialMouseXForSkew: 0,
+      initialMouseYForBias: 0,
+      originalGaussianBias: 0,
       ignoreNextBackgroundClickForGaussian: false,
       nextGaussianId: 0,
       // New properties for width handles:
-      activeDragMode: null, // Can be 'center', 'widthLeft', 'widthRight', 'skewLeft', 'skewRight', 'bias'
-      draggingWidthHandleSide: null, // 'left' or 'right'
-      widthHandleInteractionActive: false, // Flag to prioritize width handle clicks
-      widthHandleSize: 12, // Pixel size of the square width handles
-      biasInteractionActive: false, // Flag to prioritize bias handle clicks
+      activeDragMode: null,
+      draggingWidthHandleSide: null,
+      widthHandleInteractionActive: false,
+      widthHandleSize: 12,
+      biasInteractionActive: false,
     };
   },
   watch: {
@@ -357,7 +383,9 @@ export default {
     },
   },
   mounted() {
-    this.generateSampleHistogram();
+    if (!this.histogramDataProp || this.histogramDataProp.length === 0) {
+      this.generateSampleHistogram();
+    }
   },
   computed: {
     gaussianEditorEnvelopePointsString() {

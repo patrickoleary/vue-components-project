@@ -41,6 +41,64 @@ The Gaussian editor enables the creation of transfer functions by summing multip
 
 ## Features
 
+## Managing Colormaps
+
+The `AdvancedTransferFunctionEditor` component loads its available colormaps from an external JSON file located at `src/assets/colormaps.json`. You can customize the available colormaps by editing this file.
+
+### Colormap JSON Structure
+
+The `colormaps.json` file should contain a JSON array of colormap objects. Each object in the array defines a single colormap and must have the following structure:
+
+```json
+{
+  "name": "Your Colormap Name",
+  "gradient": "css-linear-gradient-value"
+}
+```
+
+*   **`name`**: (String) This is the human-readable name that will appear in the colormap selection dropdown in the component's UI.
+*   **`gradient`**: (String) This is a valid CSS `linear-gradient()` string that defines the visual appearance of the colormap.
+    *   Example: `"linear-gradient(to right, #ff0000, #00ff00, #0000ff)"` for a red-green-blue gradient.
+    *   Example: `"linear-gradient(to right, rgb(255,0,0), rgb(0,255,0), rgb(0,0,255))"`
+    *   You can use hex codes, RGB, RGBA, HSL, or HSLA values for the colors.
+
+### Updating Available Colormaps
+
+To add, remove, or modify the colormaps available in the component:
+
+1.  **Locate the file**: Open `src/assets/colormaps.json` in your project.
+2.  **Add a new colormap**:
+    *   Append a new JSON object to the array, following the structure described above.
+    *   Ensure your `name` is unique and descriptive.
+    *   Provide a valid CSS `linear-gradient` string for the `gradient` property.
+3.  **Modify an existing colormap**:
+    *   Edit the `name` or `gradient` property of an existing colormap object in the array.
+4.  **Remove a colormap**:
+    *   Delete the corresponding JSON object from the array.
+5.  **Save the file**: After making your changes, save `colormaps.json`.
+
+The component will automatically pick up these changes the next time it loads (usually on a page refresh or if the component is re-mounted, depending on your development server's hot-reloading capabilities).
+
+**Example `colormaps.json`:**
+
+```json
+[
+  {
+    "name": "Custom Rainbow",
+    "gradient": "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+  },
+  {
+    "name": "Viridis",
+    "gradient": "linear-gradient(to right, #440154, #3b528b, #21908d, #5dc863, #fde725)"
+  },
+  {
+    "name": "Grayscale",
+    "gradient": "linear-gradient(to right, #000, #fff)"
+  }
+]
+```
+
+
 *   **Colormap Selection:**
     *   Choose from a predefined list of colormaps.
     *   Colormaps are loaded from an external `colormaps.json` file.
@@ -71,59 +129,59 @@ The Gaussian editor enables the creation of transfer functions by summing multip
 
 The component can be configured through Vue props. While many settings have internal defaults, you can override them by passing these props:
 
-*   **`initialColormaps`**:
-    *   Type: `Array`
-    *   Description: An array of colormap objects. If not provided, it attempts to load from `src/assets/colormaps.json`.
-    *   Structure of `colormaps.json` (and `initialColormaps` prop):
-      ```json
-      [
-        {
-          "name": "Viridis",
-          "points": [
-            {"value": 0.0, "color": [0.267004, 0.004874, 0.329415]}, // R, G, B values (0-1)
-            {"value": 0.5, "color": [0.127568, 0.566949, 0.550556]},
-            {"value": 1.0, "color": [0.993248, 0.906157, 0.143936]}
-          ]
-        },
-        // ... more colormaps
-      ]
-      ```
-*   **`initialMinValue`**:
+*   **`initial-min-value-prop`**:
     *   Type: `Number` or `String`
     *   Default: `573.113`
-    *   Description: The initial minimum value of the data range.
-*   **`initialMaxValue`**:
+    *   Description: Sets the initial minimum value of the data range. This value is also used by the component's reset functionality.
+*   **`initial-max-value-prop`**:
     *   Type: `Number` or `String`
     *   Default: `886.808`
-    *   Description: The initial maximum value of the data range.
-*   **`initialColorSwatchValue`**:
-    *   Type: `String` (CSS color)
-    *   Default: `'#D3D3D3'` (light grey)
-    *   Description: Initial background color for the main picker area.
-*   **`initialHistogramColor`**:
-    *   Type: `String` (CSS color)
-    *   Default: `'#A9A9A9'` (medium grey)
-    *   Description: Initial color for the histogram display.
-*   **`initialTransferFunctionOpacity`**:
-    *   Type: `Number` (0.0 to 1.0)
-    *   Default: `1.0`
-    *   Description: Initial global opacity for the transfer function.
-*   **`initialTransferFunctionMode`**:
+    *   Description: Sets the initial maximum value of the data range. This value is also used by the component's reset functionality.
+*   **`initial-transfer-function-mode-prop`**:
     *   Type: `String` ('linear' or 'gaussian')
     *   Default: `'linear'`
-    *   Description: The transfer function editor mode to start with.
-*   **`initialShowHistogram`**:
-    *   Type: `Boolean`
-    *   Default: `true`
-    *   Description: Whether the histogram is initially visible.
-*   **`initialTheme`**:
+    *   Description: Sets the initial transfer function editor mode. Accepts 'linear' or 'gaussian'. This value is validated by the component.
+*   **`initial-theme-prop`**:
     *   Type: `String` ('light' or 'dark')
     *   Default: `'light'`
-    *   Description: The initial theme for the component.
-*   **`histogramData`**:
+    *   Description: Sets the initial theme for the component. Accepts 'light' or 'dark'. This value is validated by the component.
+*   **`histogram-data-prop`**:
     *   Type: `Array`
-    *   Default: `[]` (empty array, resulting in no histogram drawn by default unless populated)
-    *   Description: An array of numbers representing the histogram bins. The component will normalize and render this data if provided. Example: `[10, 20, 50, 30, 15]`
+    *   Default: `[]` (empty array)
+    *   Description: An array of numbers representing the histogram data. If this prop is provided with a non-empty array, the component will use this data for the histogram display and will skip its internal sample histogram generation. Example: `[10, 20, 50, 30, 15]`
+
+### Example Usage of Props
+
+You can pass these props to the `<AdvancedTransferFunctionEditor>` component from its parent like so:
+
+```html
+<template>
+  <AdvancedTransferFunctionEditor
+    :initial-min-value-prop="500" 
+    :initial-max-value-prop="1000"
+    :histogram-data-prop="[10, 25, 70, 40, 15]"
+    initial-theme-prop="dark"
+    initial-transfer-function-mode-prop="gaussian"
+  />
+</template>
+
+<script>
+import AdvancedTransferFunctionEditor from './components/AdvancedTransferFunctionEditor.vue';
+
+export default {
+  components: {
+    AdvancedTransferFunctionEditor
+  },
+  data() {
+    return {
+      // Example: if your histogram data is dynamic and bound
+      // myHistogramData: [10, 25, 70, 40, 15] 
+    };
+  }
+};
+</script>
+```
+**Note:** For props of type `String` (like `initial-color-swatch-value` if not bound to dynamic data), you can pass them without `v-bind`. For `Number`, `Array`, `Boolean` types, or when binding to a data property in your parent component, always use `v-bind` (or the shorthand `:`).
 
 ## Output API (Events & Data Access)
 
