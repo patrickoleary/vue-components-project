@@ -202,7 +202,7 @@ export default {
 };
 </script>
 ```
-**Note:** For props of type `String` (like `initial-color-swatch-value` if not bound to dynamic data), you can pass them without `v-bind`. For `Number`, `Array`, `Boolean` types, or when binding to a data property in your parent component, always use `v-bind` (or the shorthand `:`).
+**Note:** For props of type `String` (like `initial-theme-prop` if not bound to dynamic data, e.g., `initial-theme-prop="dark"`), you can pass them without `v-bind`. For `Number`, `Array`, `Boolean` types, or when binding to a data property in your parent component, always use `v-bind` (or the shorthand `:`).
 
 ## Output API (Events & Data Access)
 
