@@ -52,15 +52,22 @@ The `colormaps.json` file should contain a JSON array of colormap objects. Each 
 ```json
 {
   "name": "Your Colormap Name",
-  "gradient": "css-linear-gradient-value"
+  "points": [
+    { "x": 0.0, "r": 0.267, "g": 0.005, "b": 0.329 },
+    { "x": 0.5, "r": 0.129, "g": 0.565, "b": 0.553 },
+    { "x": 1.0, "r": 0.993, "g": 0.906, "b": 0.144 }
+  ]
 }
 ```
 
 *   **`name`**: (String) This is the human-readable name that will appear in the colormap selection dropdown in the component's UI.
-*   **`gradient`**: (String) This is a valid CSS `linear-gradient()` string that defines the visual appearance of the colormap.
-    *   Example: `"linear-gradient(to right, #ff0000, #00ff00, #0000ff)"` for a red-green-blue gradient.
-    *   Example: `"linear-gradient(to right, rgb(255,0,0), rgb(0,255,0), rgb(0,0,255))"`
-    *   You can use hex codes, RGB, RGBA, HSL, or HSLA values for the colors.
+*   **`points`**: (Array of Objects) An array of color points that define the colormap.
+    *   Each point object in the array must have the following properties:
+        *   **`x`**: (Number) The normalized position of the color point along the gradient, ranging from `0.0` (start) to `1.0` (end). Points should ideally be sorted by their `x` value, though the component will attempt to sort them.
+        *   **`r`**: (Number) The red component of the color, normalized between `0.0` (no red) and `1.0` (full red).
+        *   **`g`**: (Number) The green component of the color, normalized between `0.0` (no green) and `1.0` (full green).
+        *   **`b`**: (Number) The blue component of the color, normalized between `0.0` (no blue) and `1.0` (full blue).
+    *   You need at least two points to define a gradient. A single point will result in a solid color.
 
 ### Updating Available Colormaps
 
@@ -70,30 +77,43 @@ To add, remove, or modify the colormaps available in the component:
 2.  **Add a new colormap**:
     *   Append a new JSON object to the array, following the structure described above.
     *   Ensure your `name` is unique and descriptive.
-    *   Provide a valid CSS `linear-gradient` string for the `gradient` property.
+    *   Define the `points` array with at least two color points, ensuring `x`, `r`, `g`, `b` values are normalized between 0.0 and 1.0.
 3.  **Modify an existing colormap**:
-    *   Edit the `name` or `gradient` property of an existing colormap object in the array.
+    *   Edit the `name` or modify the `points` array (add, remove, or change points) of an existing colormap object.
 4.  **Remove a colormap**:
     *   Delete the corresponding JSON object from the array.
 5.  **Save the file**: After making your changes, save `colormaps.json`.
 
-The component will automatically pick up these changes the next time it loads (usually on a page refresh or if the component is re-mounted, depending on your development server's hot-reloading capabilities).
+The component will automatically pick up these changes the next time it loads.
 
 **Example `colormaps.json`:**
 
 ```json
 [
   {
-    "name": "Custom Rainbow",
-    "gradient": "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+    "name": "Custom RGB",
+    "points": [
+      { "x": 0.0, "r": 1.0, "g": 0.0, "b": 0.0 },
+      { "x": 0.5, "r": 0.0, "g": 1.0, "b": 0.0 },
+      { "x": 1.0, "r": 0.0, "g": 0.0, "b": 1.0 }
+    ]
   },
   {
     "name": "Viridis",
-    "gradient": "linear-gradient(to right, #440154, #3b528b, #21908d, #5dc863, #fde725)"
+    "points": [
+      { "x": 0.0,  "r": 0.2666, "g": 0.0039, "b": 0.3294 },
+      { "x": 0.25, "r": 0.2313, "g": 0.3215, "b": 0.5450 },
+      { "x": 0.5,  "r": 0.1294, "g": 0.5647, "b": 0.5529 },
+      { "x": 0.75, "r": 0.3647, "g": 0.7843, "b": 0.3882 },
+      { "x": 1.0,  "r": 0.9921, "g": 0.9058, "b": 0.1450 }
+    ]
   },
   {
     "name": "Grayscale",
-    "gradient": "linear-gradient(to right, #000, #fff)"
+    "points": [
+      { "x": 0.0, "r": 0.0, "g": 0.0, "b": 0.0 },
+      { "x": 1.0, "r": 1.0, "g": 1.0, "b": 1.0 }
+    ]
   }
 ]
 ```

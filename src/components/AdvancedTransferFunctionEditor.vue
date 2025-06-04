@@ -4,8 +4,8 @@
       <input type="color" class="compact-color-picker" v-model="backgroundColorValue" title="Selected Base Color" />
       <input type="color" id="histogram-color-input" class="compact-color-picker" v-model="histogramColor" title="Histogram Color">
       <input type="text" class="number-input" v-model="minValue" title="Minimum Value" />
-      <select class="gradient-display" v-model="selectedColormapGradient" :style="{ background: selectedColormapGradient, color: 'transparent' }" title="Select Colormap">
-        <option v-for="cmap in colormaps" :key="cmap.name" :value="cmap.gradient">
+      <select class="gradient-display" v-model="selectedColormapName" :style="{ background: selectedColormapGeneratedGradient, color: 'transparent' }" title="Select Colormap">
+        <option v-for="cmap in colormaps" :key="cmap.name" :value="cmap.name">
           {{ cmap.name }}
         </option>
       </select>
@@ -306,7 +306,7 @@ export default {
       initialMinValue: this.initialMinValueProp, // For reset, now sourced from prop
       initialMaxValue: this.initialMaxValueProp, // For reset, now sourced from prop
       colormaps: colormapOptions,
-      selectedColormapGradient: colormapOptions.length > 0 ? colormapOptions[0].gradient : '',
+      selectedColormapName: colormapOptions.length > 0 ? colormapOptions[0].name : null,
       transferFunctionMode: this.initialTransferFunctionModeProp,
       transferFunctionModes: [
         { value: 'linear', text: 'Linear' },
@@ -638,27 +638,34 @@ export default {
         visible: true
       };    
     },
-    currentGradientStops() {
-      if (!this.selectedColormapGradient) return [];
-      // Example: "linear-gradient(to right, #ff0000, #00ff00 50%, #0000ff)"
-      // Simpler parsing for now, assuming colors are just listed or hex/rgb.
-      // More robust parsing might be needed for complex CSS gradients.
-      const gradientString = this.selectedColormapGradient;
-      const colorRegex = /(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))/g;
-      const colors = [];
-      let match;
-      while ((match = colorRegex.exec(gradientString)) !== null) {
-        colors.push(match[0]);
+    selectedColormap() {
+      if (!this.selectedColormapName || !this.colormaps) return null;
+      return this.colormaps.find(cmap => cmap.name === this.selectedColormapName);
+    },
+    selectedColormapGeneratedGradient() {
+      if (!this.selectedColormap || !this.selectedColormap.points) {
+        return 'linear-gradient(to right, black, white)'; // Default/error
       }
+      return this.generateGradientFromPoints(this.selectedColormap.points);
+    },
+    currentGradientStops() {
+      if (!this.selectedColormap || !this.selectedColormap.points || this.selectedColormap.points.length === 0) {
+        // Return a default black to white gradient if no valid points
+        return [
+          { offset: '0%', color: 'rgb(0,0,0)' },
+          { offset: '100%', color: 'rgb(255,255,255)' }
+        ];
+      }
+      // Sort points by x, just in case they aren't already.
+      const sortedPoints = [...this.selectedColormap.points].sort((a, b) => a.x - b.x);
 
-      if (colors.length === 0) return [];
-      if (colors.length === 1) return [{ offset: '0%', color: colors[0] }, { offset: '100%', color: colors[0] }];
-
-      return colors.map((color, index) => {
-        const offset = (index / (colors.length - 1)) * 100;
+      return sortedPoints.map(point => {
+        const r = Math.round(point.r * 255);
+        const g = Math.round(point.g * 255);
+        const b = Math.round(point.b * 255);
         return {
-          offset: `${offset}%`,
-          color: color,
+          offset: `${Math.round(point.x * 100)}%`,
+          color: `rgb(${r},${g},${b})`
         };
       });
     },
@@ -804,6 +811,23 @@ export default {
     document.removeEventListener('mouseup', this.handleGaussianBiasMouseUp);
   },
   methods: {
+    generateGradientFromPoints(pointsArray) {
+      if (!pointsArray || pointsArray.length === 0) {
+        return 'linear-gradient(to right, black, white)'; // Default or error gradient
+      }
+      // Sort points by x, just in case they aren't already.
+      const sortedPoints = [...pointsArray].sort((a, b) => a.x - b.x);
+
+      const stops = sortedPoints.map(point => {
+        const r = Math.round(point.r * 255);
+        const g = Math.round(point.g * 255);
+        const b = Math.round(point.b * 255);
+        const position = Math.round(point.x * 100);
+        return `rgb(${r}, ${g}, ${b}) ${position}%`;
+      });
+
+      return `linear-gradient(to right, ${stops.join(', ')})`;
+    },
     getGaussianEnvelopeRawPoints() {
       const bottomYPixel = this.normalizedToPixel({ x: 0, y: 0 }).y; // y=0 normalized is bottom of graph
       const startPixelPoint = { x: this.normalizedToPixel({ x: 0, y: 0 }).x, y: bottomYPixel };
