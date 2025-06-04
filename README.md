@@ -22,8 +22,9 @@ The linear editor allows users to define a piecewise linear transfer function by
 ![Linear Transfer Function Editor](docs/images/linear-editor.png)
 
 *   **Add Points:** Click on an empty area in the editor canvas.
-*   **Move Points:** Drag existing points horizontally (to change data value) or vertically (to change opacity).
-*   **Delete Points:** Right-click (or context-click) on a point.
+*   **Select Point:** Click on a control point.
+*   **Move Points:** Click and hold on a selected point, then drag it horizontally (to change data value) or vertically (to change opacity).
+*   **Delete Points:** Double-click on a point.
 *   The background displays the selected colormap blended with the opacity defined by the linear function.
 
 ### 2. Gaussian Transfer Function Editor
@@ -33,11 +34,11 @@ The Gaussian editor enables the creation of transfer functions by summing multip
 ![Gaussian Transfer Function Editor](docs/images/gaussian-editor.png)
 
 *   **Add Gaussians:** Click on an empty area in the editor canvas to add a new Gaussian centered at the click location.
-*   **Select Gaussian:** Click on a Gaussian to select it for editing.
-*   **Move Gaussian:** Drag the peak control point (circle) of a selected Gaussian to change its center and height.
-*   **Adjust Width:** Drag the horizontal square handles at the base of a selected Gaussian to change its width.
-*   **Adjust Bias:** Drag the vertical triangle handles of a selected Gaussian to adjust its bias, affecting the curve's skewness.
-*   **Delete Gaussian:** Right-click (or context-click) on a Gaussian's peak control point.
+*   **Select Gaussian or its Handles:** Click on a Gaussian's body to select the entire component, or click on one of its handles (peak, width, bias) to begin manipulating it.
+*   **Move Gaussian:** Click and hold on the peak control point (circle) of a selected Gaussian, then drag horizontally to change its center (data value) and vertically to change its maximum opacity (height).
+*   **Adjust Width:** Click and hold on the horizontal square handles at the base of a selected Gaussian, then drag to change its width.
+*   **Adjust Bias:** Click and hold on the vertical triangle handles of a selected Gaussian, then drag to adjust its bias, affecting the curve's skewness.
+*   **Delete Gaussian:** Double-click on a Gaussian's peak control point.
 
 ## Features
 
